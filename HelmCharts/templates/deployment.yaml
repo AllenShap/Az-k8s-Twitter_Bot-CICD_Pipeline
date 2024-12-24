@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fastapicont
+spec:
+  selector:
+    matchLabels:
+      app: fastapicont
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: fastapicont
+    spec:
+      containers:
+      - name: fastapicont
+        image: "{{ .Values.image1.imagename1 }}:{{ .Values.image1.imagetag1 }}"
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8001
+      - name: pythonxfunction
+        image: "{{ .Values.image2.imagename2 }}:{{ .Values.image2.imagetag2 }}"
+        imagePullPolicy: Always
+        env:
+          - name: COSMOS_DB_CONTAINER_NAME
+            value: {{ .Values.COSMOS_DB_CONTAINER_NAME | quote}}
+          - name: COSMOS_DB_ENDPOINT
+            value: {{ .Values.COSMOS_DB_ENDPOINT | quote}}
+          - name: COSMOS_DB_NAME
+            value: {{ .Values.COSMOS_DB_NAME | quote}}
+          - name: COSMOS_DB_CREDENTIAL
+            value: {{ .Values.COSMOS_DB_CREDENTIAL | quote}}
+          - name: TWITTER_CONSUMER_KEY
+            value: {{ .Values.TWITTER_CONSUMER_KEY | quote}}
+          - name: TWITTER_CONSUMER_SECRET
+            value: {{ .Values.TWITTER_CONSUMER_SECRET | quote}}
+          - name: TWITTER_ACCESS_TOKEN
+            value: {{ .Values.TWITTER_ACCESS_TOKEN | quote}}
+          - name: TWITTER_ACCESS_TOKEN_SECRET
+            value: {{ .Values.TWITTER_ACCESS_TOKEN_SECRET | quote}}
+          - name: COGNITIVE_ENDPOINT
+            value: {{ .Values.COGNITIVE_ENDPOINT | quote}}
+          - name: COGNITIVE_KEY
+            value: {{ .Values.COGNITIVE_KEY | quote}}
+          - name: COGNITIVE_SEARCH_ENDPOINT
+            value: {{ .Values.COGNITIVE_SEARCH_ENDPOINT | quote}}
+          - name: COGNITIVE_SEARCH_KEY
+            value: {{ .Values.COGNITIVE_SEARCH_KEY | quote}}
+          - name: APPLICATIONINSIGHTS_CONNECTION_STRING
+            value: {{ .Values.APPLICATIONINSIGHTS_CONNECTION_STRING | quote}}
+      - name: gluetun
+        image: "{{ .Values.image3.imagename3 }}:{{ .Values.image3.imagetag3 }}"
+        env:
+          - name: VPN_ENDPOINT_IP
+            value: {{ .Values.VPN_ENDPOINT_IP | quote}}
+          - name: VPN_ENDPOINT_PORT
+            value: {{ .Values.VPN_ENDPOINT_PORT | quote}}
+          - name: VPN_SERVICE_PROVIDER
+            value: custom
+          - name: VPN_TYPE
+            value: wireguard
+          - name: WIREGUARD_ADDRESSES
+            value: {{ .Values.WIREGUARD_ADDRESSES | quote}}
+          - name: WIREGUARD_PRIVATE_KEY
+            value: {{ .Values.WIREGUARD_PRIVATE_KEY | quote}}
+          - name: WIREGUARD_PUBLIC_KEY
+            value: {{ .Values.WIREGUARD_PUBLIC_KEY | quote}}
+        securityContext:
+          capabilities:
+            add:
+              - NET_ADMIN
+          privileged: true
