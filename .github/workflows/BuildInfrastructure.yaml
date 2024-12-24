@@ -50,7 +50,6 @@ jobs:
     - name: Set ACR credential Variables & write to artifact
       id: vars
       run: |
-        echo "::add-mask::${{ github.run_id }}"
 
         mkdir ./ACRArtifacts${{ github.run_id }}/
         mkdir ./InfrastructureArtifacts${{ github.run_id }}/
@@ -92,20 +91,20 @@ jobs:
 
         echo "WG_Storage_Account_Name=$WG_Storage_Account_Name" >> $GITHUB_ENV
         echo "WG_Storage_Container_Name=$WG_Storage_Container_Name" >> $GITHUB_ENV
-        echo $login_server >> ./ACRArtifacts/loginServer.txt
-        echo $admin_username >> ./ACRArtifacts/adminUsername.txt
-        echo $admin_password >> ./ACRArtifacts/adminPassword.txt
-        echo $resource_group_name >> ./ACRArtifacts/resourceGroupName.txt
-        echo $aks_cluster_name >> ./ACRArtifacts/aksClusterName.txt
-        echo $AZURE_COSMOS_DB_CONTAINER_NAME >> ./InfrastructureArtifacts/AZURE_COSMOS_DB_CONTAINER_NAME.txt
-        echo $AZURE_COSMOS_DB_ENDPOINT >> ./InfrastructureArtifacts/AZURE_COSMOS_DB_ENDPOINT.txt
-        echo $AZURE_COSMOS_DB_DATABASE_NAME >> ./InfrastructureArtifacts/AZURE_COSMOS_DB_DATABASE_NAME.txt
-        echo $AZURE_COSMOS_DB_CREDENTIAL >> ./InfrastructureArtifacts/AZURE_COSMOS_DB_CREDENTIAL.txt
-        echo $AZURE_COGNITIVE_KEY >> ./InfrastructureArtifacts/AZURE_COGNITIVE_KEY.txt
-        echo $AZURE_COGNITIVE_SEARCH_KEY >> ./InfrastructureArtifacts/AZURE_COGNITIVE_SEARCH_KEY.txt
-        echo $application_insights_connection_string >> ./InfrastructureArtifacts/application_insights_connection_string.txt
-        echo $AZURE_COGNITIVE_ENDPOINT >> ./InfrastructureArtifacts/AZURE_COGNITIVE_ENDPOINT.txt
-        echo $AZURE_COGNITIVE_SEARCH_SERVICE_URL >> ./InfrastructureArtifacts/AZURE_COGNITIVE_SEARCH_SERVICE_URL.txt
+        echo $login_server >> ./ACRArtifacts${{ github.run_id }}/loginServer.txt
+        echo $admin_username >> ./ACRArtifacts${{ github.run_id }}/adminUsername.txt
+        echo $admin_password >> ./ACRArtifacts${{ github.run_id }}/adminPassword.txt
+        echo $resource_group_name >> ./ACRArtifacts${{ github.run_id }}/resourceGroupName.txt
+        echo $aks_cluster_name >> ./ACRArtifacts${{ github.run_id }}/aksClusterName.txt
+        echo $AZURE_COSMOS_DB_CONTAINER_NAME >> ./InfrastructureArtifacts${{ github.run_id }}/AZURE_COSMOS_DB_CONTAINER_NAME.txt
+        echo $AZURE_COSMOS_DB_ENDPOINT >> ./InfrastructureArtifacts${{ github.run_id }}/AZURE_COSMOS_DB_ENDPOINT.txt
+        echo $AZURE_COSMOS_DB_DATABASE_NAME >> ./InfrastructureArtifacts${{ github.run_id }}/AZURE_COSMOS_DB_DATABASE_NAME.txt
+        echo $AZURE_COSMOS_DB_CREDENTIAL >> ./InfrastructureArtifacts${{ github.run_id }}/AZURE_COSMOS_DB_CREDENTIAL.txt
+        echo $AZURE_COGNITIVE_KEY >> ./InfrastructureArtifacts${{ github.run_id }}/AZURE_COGNITIVE_KEY.txt
+        echo $AZURE_COGNITIVE_SEARCH_KEY >> ./InfrastructureArtifacts${{ github.run_id }}/AZURE_COGNITIVE_SEARCH_KEY.txt
+        echo $application_insights_connection_string >> ./InfrastructureArtifacts${{ github.run_id }}/application_insights_connection_string.txt
+        echo $AZURE_COGNITIVE_ENDPOINT >> ./InfrastructureArtifacts${{ github.run_id }}/AZURE_COGNITIVE_ENDPOINT.txt
+        echo $AZURE_COGNITIVE_SEARCH_SERVICE_URL >> ./InfrastructureArtifacts${{ github.run_id }}/AZURE_COGNITIVE_SEARCH_SERVICE_URL.txt
 
     - name: Install azcopy
       run: |
