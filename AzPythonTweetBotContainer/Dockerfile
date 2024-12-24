@@ -39,3 +39,5 @@ RUN LATEST_VERSION=$(curl -sk https://api.github.com/repos/mozilla/geckodriver/r
 COPY requirements.txt /home/site/wwwroot/
 RUN pip install -r /home/site/wwwroot/requirements.txt
 COPY . /home/site/wwwroot
+
+
