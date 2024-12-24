@@ -166,7 +166,7 @@ jobs:
           fi
 
           if [[ -n "$workflow_name" ]]; then # Check if a workflow name was found
-              LatestWorkflowRunID=$(gh api /repos/CrimsonGlacier/workingk8sdeployment/actions/runs | jq -r --arg workflow_name "$workflow_name" '[.workflow_runs[] | select(.name == $workflow_name) | select(.conclusion == "success")] | .[0].id')
+              LatestWorkflowRunID=$(gh api /repos/AllenShap/Az-k8s-Twitter_Bot-CICD_Pipeline/actions/runs | jq -r --arg workflow_name "$workflow_name" '[.workflow_runs[] | select(.name == $workflow_name) | select(.conclusion == "success")] | .[0].id')
               echo "::add-mask::$LatestWorkflowRunID"
               echo "LatestWorkflowRunID=$LatestWorkflowRunID" >> $GITHUB_ENV
           else
