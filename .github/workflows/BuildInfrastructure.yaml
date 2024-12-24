@@ -1,0 +1,149 @@
+name: Terraform Build & Deploy
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'Terraform/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  TF_VAR_AZURE_ACCESS_KEY: ${{ secrets.TF_VAR_AZURE_ACCESS_KEY }}
+  TF_VAR_AZURE_STORAGE_ACCOUNT_NAME: ${{ secrets.TF_VAR_AZURE_STORAGE_ACCOUNT_NAME }} 
+  TF_VAR_AZURE_CONTAINER_NAME: ${{ secrets.TF_VAR_AZURE_CONTAINER_NAME }} 
+  ARM_SUBSCRIPTION_ID:  ${{ secrets.AZURE_SUBSCRIPTION }}
+  GH_TOKEN: ${{ secrets.MY_PAT_TOKEN }} 
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4.1.1
+
+
+    - name: Azure Login
+      uses: azure/login@v2
+      with:
+        creds: '{"clientId":"${{ secrets.AZURE_APPID }}","clientSecret":"${{ secrets.AZURE_PASSWORD }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION }}","tenantId":"${{ secrets.AZURE_TENANT }}"}'
+
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2.0.3
+      with:
+        terraform_wrapper: false
+
+
+    - name: Terraform Init
+      run: terraform init -backend-config="access_key=${{ env.TF_VAR_AZURE_ACCESS_KEY }}" -backend-config="storage_account_name=${{ env.TF_VAR_AZURE_STORAGE_ACCOUNT_NAME }}" -backend-config="container_name=${{ env.TF_VAR_AZURE_CONTAINER_NAME }}" -backend-config="key=terraform.tfstate"
+      working-directory: ./Terraform 
+
+
+    - name: Terraform Apply
+      run: terraform apply -no-color -input=false -auto-approve -var resource_group_location=${{ secrets.RESOURCE_GROUP_LOCATION }} -var resource_group_name=${{ secrets.RESOURCE_GROUP_NAME }} -var AKS_resource_group_name=${{ secrets.AKS_RESOURCE_GROUP_NAME }} -var container_registry_name=${{ secrets.CONTAINER_REGISTRY_NAME }} -var kubernetes_cluster_name=${{ secrets.KUBERNETES_CLUSTER_NAME }} -var backend_resources_RG_name=${{ secrets.BACKEND_RESOURCES_RG_NAME }} -var azurerm_cosmosdb_account_name=${{ secrets.AZURERM_COSMOSDB_ACCOUNT_NAME }} -var azurerm_cosmosdb_sql_database_name=${{ secrets.AZURERM_COSMOSDB_SQL_DATABASE_NAME }} -var azurerm_cosmosdb_sql_container_name=${{ secrets.AZURERM_COSMOSDB_SQL_CONTAINER_NAME }} -var azurerm_cognitive_account_name=${{ secrets.AZURERM_COGNITIVE_ACCOUNT_NAME }} -var azurerm_search_service_name=${{ secrets.AZURERM_SEARCH_SERVICE_NAME }} -var azurerm_log_analytics_workspace_name=${{ secrets.AZURERM_LOG_ANALYTICS_WORKSPACE_NAME }} -var azurerm_application_insights_name=${{ secrets.AZURERM_APPLICATION_INSIGHTS_NAME }} -var Additional_Object_ID_For_KeyVault_Access=${{ secrets.ADDITIONAL_OBJECT_ID_FOR_KEYVAULT_ACCESS }} -var Storage_Account_Name_for_WireGuard_VPN_Configs=${{ secrets.STORAGE_ACCOUNT_NAME_FOR_WIREGUARD_VPN_CONFIGS }} -var Storage_Container_Name_for_WireGuard_VPN_Configs=${{ secrets.STORAGE_CONTAINER_NAME_FOR_WIREGUARD_VPN_CONFIGS }} 
+      working-directory: ./Terraform
+
+
+    - name: Set ACR credential Variables & write to artifact
+      id: vars
+      run: |
+        echo "::add-mask::${{ github.run_id }}"
+
+        mkdir ./ACRArtifacts${{ github.run_id }}/
+        mkdir ./InfrastructureArtifacts${{ github.run_id }}/
+        mkdir ./WireGuardArtifacts${{ github.run_id }}/
+
+        login_server=$(printf "%s\n" $(terraform -chdir="./Terraform" output -raw login_server))
+        admin_username=$(printf "%s\n" $(terraform -chdir="./Terraform" output -raw admin_username))
+        admin_password=$(printf "%s\n" $(terraform -chdir="./Terraform" output -raw admin_password))
+        resource_group_name=$(printf "%s\n" $(terraform -chdir="./Terraform" output -raw AKS_resource_group_name))
+        aks_cluster_name=$(printf "%s\n" $(terraform -chdir="./Terraform" output -raw aks_cluster_name))
+        AZURE_COSMOS_DB_CONTAINER_NAME=$(printf "%s\n" $(terraform -chdir="./Terraform" output -raw AZURE_COSMOS_DB_CONTAINER_NAME))
+        AZURE_COSMOS_DB_ENDPOINT=$(printf "%s\n" $(terraform -chdir="./Terraform" output -raw AZURE_COSMOS_DB_ENDPOINT))
+        AZURE_COSMOS_DB_DATABASE_NAME=$(printf "%s\n" $(terraform -chdir="./Terraform" output -raw AZURE_COSMOS_DB_DATABASE_NAME))
+        AZURE_COSMOS_DB_CREDENTIAL=$(printf "%s\n" $(terraform -chdir="./Terraform" output -raw AZURE_COSMOS_DB_CREDENTIAL))
+        AZURE_COGNITIVE_KEY=$(printf "%s\n" $(terraform -chdir="./Terraform" output -raw AZURE_COGNITIVE_KEY))
+        AZURE_COGNITIVE_SEARCH_KEY=$(printf "%s\n" $(terraform -chdir="./Terraform" output -raw AZURE_COGNITIVE_SEARCH_KEY))
+        application_insights_connection_string=$(printf "%s\n" $(terraform -chdir="./Terraform" output -raw application_insights_connection_string))
+        AZURE_COGNITIVE_ENDPOINT=$(printf "%s\n" $(terraform -chdir="./Terraform" output -raw AZURE_COGNITIVE_ENDPOINT))
+        AZURE_COGNITIVE_SEARCH_SERVICE_URL=$(printf "%s\n" $(terraform -chdir="./Terraform" output -raw AZURE_COGNITIVE_SEARCH_SERVICE_URL))
+        WG_Storage_Account_Name=$(printf "%s\n" $(terraform -chdir="./Terraform" output -raw WG_Storage_Account_Name))
+        WG_Storage_Container_Name=$(printf "%s\n" $(terraform -chdir="./Terraform" output -raw WG_Storage_Container_Name))
+
+        echo "::add-mask::${AZURE_COSMOS_DB_CONTAINER_NAME}"
+        echo "::add-mask::${AZURE_COSMOS_DB_ENDPOINT}"
+        echo "::add-mask::${AZURE_COSMOS_DB_DATABASE_NAME}"
+        echo "::add-mask::${AZURE_COSMOS_DB_CREDENTIAL}"
+        echo "::add-mask::${AZURE_COGNITIVE_KEY}"
+        echo "::add-mask::${AZURE_COGNITIVE_SEARCH_KEY}"
+        echo "::add-mask::${application_insights_connection_string}"
+        echo "::add-mask::${AZURE_COGNITIVE_ENDPOINT}"
+        echo "::add-mask::${AZURE_COGNITIVE_SEARCH_SERVICE_URL}"
+        echo "::add-mask::${login_server}"
+        echo "::add-mask::${admin_username}"
+        echo "::add-mask::${admin_password}"
+        echo "::add-mask::${resource_group_name}"
+        echo "::add-mask::${aks_cluster_name}"
+        echo "::add-mask::${WG_Storage_Account_Name}"
+        echo "::add-mask::${WG_Storage_Container_Name}"
+
+        echo "WG_Storage_Account_Name=$WG_Storage_Account_Name" >> $GITHUB_ENV
+        echo "WG_Storage_Container_Name=$WG_Storage_Container_Name" >> $GITHUB_ENV
+        echo $login_server >> ./ACRArtifacts/loginServer.txt
+        echo $admin_username >> ./ACRArtifacts/adminUsername.txt
+        echo $admin_password >> ./ACRArtifacts/adminPassword.txt
+        echo $resource_group_name >> ./ACRArtifacts/resourceGroupName.txt
+        echo $aks_cluster_name >> ./ACRArtifacts/aksClusterName.txt
+        echo $AZURE_COSMOS_DB_CONTAINER_NAME >> ./InfrastructureArtifacts/AZURE_COSMOS_DB_CONTAINER_NAME.txt
+        echo $AZURE_COSMOS_DB_ENDPOINT >> ./InfrastructureArtifacts/AZURE_COSMOS_DB_ENDPOINT.txt
+        echo $AZURE_COSMOS_DB_DATABASE_NAME >> ./InfrastructureArtifacts/AZURE_COSMOS_DB_DATABASE_NAME.txt
+        echo $AZURE_COSMOS_DB_CREDENTIAL >> ./InfrastructureArtifacts/AZURE_COSMOS_DB_CREDENTIAL.txt
+        echo $AZURE_COGNITIVE_KEY >> ./InfrastructureArtifacts/AZURE_COGNITIVE_KEY.txt
+        echo $AZURE_COGNITIVE_SEARCH_KEY >> ./InfrastructureArtifacts/AZURE_COGNITIVE_SEARCH_KEY.txt
+        echo $application_insights_connection_string >> ./InfrastructureArtifacts/application_insights_connection_string.txt
+        echo $AZURE_COGNITIVE_ENDPOINT >> ./InfrastructureArtifacts/AZURE_COGNITIVE_ENDPOINT.txt
+        echo $AZURE_COGNITIVE_SEARCH_SERVICE_URL >> ./InfrastructureArtifacts/AZURE_COGNITIVE_SEARCH_SERVICE_URL.txt
+
+    - name: Install azcopy
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wget
+
+        # when ubuntu-latest changes this needs updating from 22.04
+        wget https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb
+        sudo dpkg -i packages-microsoft-prod.deb
+        sudo apt-get update
+        sudo apt-get install -y azcopy
+        rm -f packages-microsoft-prod.deb
+
+
+    - name: login to AzCopy with Service Principal credentials
+      env:
+        AZCOPY_SPA_CLIENT_SECRET: ${{ secrets.AZURE_PASSWORD }}
+      run: |
+        azcopy login --service-principal --application-id "${{ secrets.AZURE_APPID }}" --tenant-id "${{ secrets.AZURE_TENANT }}"
+
+
+      # Sleep here is required since the VM does not always finish uploading all files into the Azure Storage Container by this point in the workflow which causes the following workflow to fail
+    - name: Sleep for 30 seconds
+      run: sleep 30s
+      shell: bash
+
+
+    - name: Download the latest credentials associated with the provisioned WireGuard VPN server
+      run: |
+        azcopy copy "https://${{ env.WG_Storage_Account_Name }}.blob.core.windows.net/${{ env.WG_Storage_Container_Name }}/vpn-endpoint-ip.txt" "./WireGuardArtifacts${{ github.run_id }}/"
+        azcopy copy "https://${{ env.WG_Storage_Account_Name }}.blob.core.windows.net/${{ env.WG_Storage_Container_Name }}/vpn-endpoint-port.txt" "./WireGuardArtifacts${{ github.run_id }}/"
+        azcopy copy "https://${{ env.WG_Storage_Account_Name }}.blob.core.windows.net/${{ env.WG_Storage_Container_Name }}/wireguard-addresses.txt" "./WireGuardArtifacts${{ github.run_id }}/"
+        azcopy copy "https://${{ env.WG_Storage_Account_Name }}.blob.core.windows.net/${{ env.WG_Storage_Container_Name }}/wireguard-private-key.txt" "./WireGuardArtifacts${{ github.run_id }}/"
+        azcopy copy "https://${{ env.WG_Storage_Account_Name }}.blob.core.windows.net/${{ env.WG_Storage_Container_Name }}/wireguard-public-key.txt" "./WireGuardArtifacts${{ github.run_id }}/"
+
+
+    - name: Upload the latest credentials associated with the Terraform infrastructure deployment to the created storage account
+      run: |
+        azcopy copy "./ACRArtifacts${{ github.run_id }}/" "https://${{ env.WG_Storage_Account_Name }}.blob.core.windows.net/${{ env.WG_Storage_Container_Name }}" --recursive=true
+        azcopy copy "./InfrastructureArtifacts${{ github.run_id }}/" "https://${{ env.WG_Storage_Account_Name }}.blob.core.windows.net/${{ env.WG_Storage_Container_Name }}" --recursive=true
+        azcopy copy "./WireGuardArtifacts${{ github.run_id }}/" "https://${{ env.WG_Storage_Account_Name }}.blob.core.windows.net/${{ env.WG_Storage_Container_Name }}" --recursive=true
