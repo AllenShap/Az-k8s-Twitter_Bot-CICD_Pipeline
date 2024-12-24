@@ -1,0 +1,257 @@
+name: Terraform Modification Run
+
+on:
+  workflow_run:
+    workflows: [Terraform Build & Deploy]
+    types: [completed]
+  workflow_dispatch:
+    
+permissions:
+  contents: write
+
+env:                                                                                       
+  CONSUMER_KEY: ${{ secrets.TWITTER_CONSUMER_KEY }}                                                      
+  CONSUMER_SECRET: ${{ secrets.TWITTER_CONSUMER_SECRET }}   
+  ACCESS_TOKEN: ${{ secrets.TWITTER_ACCESS_TOKEN }}
+  ACCESS_TOKEN_SECRET: ${{ secrets.TWITTER_ACCESS_TOKEN_SECRET }}
+  GH_TOKEN: ${{ secrets.MY_PAT_TOKEN }}
+  FASTAPI_IMAGE_NAME: 'azpythontweetbot-fastapicontainer'
+  AZURE_FUNCTION_IMAGE_NAME: 'azpythontweetbot-azurefunction'
+  GLUETUN_IMAGE_NAME: 'azpythontweetbot-gluetun'
+
+
+jobs:
+  build:
+      runs-on: ubuntu-latest
+      steps:     
+      - name: Checkout
+        uses: actions/checkout@v4.1.1
+
+
+      - name: Get latest commit SHA to tag Docker images
+        run: |
+          GH_TOKEN=${{ secrets.MY_PAT_TOKEN }} 
+          echo "currentCommit=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+
+      - name: Get latest successful Terraform deployment workflow run id
+        run: |
+          GH_TOKEN=${{ secrets.MY_PAT_TOKEN }} 
+          TFInfraDeploymentRunID=$(gh api /repos/AllenShap/Az-k8s-Twitter_Bot-CICD_Pipeline/actions/runs | jq -r '[.workflow_runs[] | select(.name == "Terraform Build & Deploy")| select(.conclusion == "success")]' | jq '.[0].id')
+          echo "::add-mask::$TFInfraDeploymentRunID"
+          echo "TFInfraDeploymentRunID=$TFInfraDeploymentRunID" >> $GITHUB_ENV
+
+
+      - name: login to AzCopy with Service Principal credentials
+        env:
+          AZCOPY_SPA_CLIENT_SECRET: ${{ secrets.AZURE_PASSWORD }}
+        run: |
+          azcopy login --service-principal --application-id "${{ secrets.AZURE_APPID }}" --tenant-id "${{ secrets.AZURE_TENANT }}"
+
+
+      - name: Download the latest build artifacts associated with the initial Terraform Infrastructure deployment
+        run: |
+          azcopy copy "https://${{ secrets.STORAGE_ACCOUNT_NAME_FOR_WIREGUARD_VPN_CONFIGS }}.blob.core.windows.net/${{ secrets.STORAGE_CONTAINER_NAME_FOR_WIREGUARD_VPN_CONFIGS }}/ACRArtifacts${{ env.TFInfraDeploymentRunID }}/" "./ACR_Artifacts/" --recursive
+          azcopy copy "https://${{ secrets.STORAGE_ACCOUNT_NAME_FOR_WIREGUARD_VPN_CONFIGS }}.blob.core.windows.net/${{ secrets.STORAGE_CONTAINER_NAME_FOR_WIREGUARD_VPN_CONFIGS }}/InfrastructureArtifacts${{ env.TFInfraDeploymentRunID }}/" "./Azure_Infra_Artifacts/" --recursive
+          azcopy copy "https://${{ secrets.STORAGE_ACCOUNT_NAME_FOR_WIREGUARD_VPN_CONFIGS }}.blob.core.windows.net/${{ secrets.STORAGE_CONTAINER_NAME_FOR_WIREGUARD_VPN_CONFIGS }}/WireGuardArtifacts${{ env.TFInfraDeploymentRunID }}/" "./WireGuard_Artifacts/" --recursive
+          
+
+      - name: Output ACR & WG credential artifact values
+        id: ACRCreds
+        run: |
+          ACRloginServerValue=$(cat ./ACR_Artifacts/loginServer.txt)
+          ACRAdminUsernameValue=$(cat ./ACR_Artifacts/adminUsername.txt)
+          ACRAdminPasswordValue=$(cat ./ACR_Artifacts/adminPassword.txt)
+          AKSClusterNameValue=$(cat ./ACR_Artifacts/aksClusterName.txt)
+          resourceGroupNameValue=$(cat ./ACR_Artifacts/resourceGroupName.txt)
+          VPN_ENDPOINT_IP=$(cat ./WireGuard_Artifacts/vpn-endpoint-ip.txt)
+          VPN_ENDPOINT_PORT=$(cat ./WireGuard_Artifacts/vpn-endpoint-port.txt)
+          WIREGUARD_ADDRESSES=$(cat ./WireGuard_Artifacts/wireguard-addresses.txt)
+          WIREGUARD_PRIVATE_KEY=$(cat ./WireGuard_Artifacts/wireguard-private-key.txt)
+          WIREGUARD_PUBLIC_KEY=$(cat ./WireGuard_Artifacts/wireguard-public-key.txt)
+          AZURE_COSMOS_DB_CONTAINER_NAME=$(cat ./Azure_Infra_Artifacts/AZURE_COSMOS_DB_CONTAINER_NAME.txt)
+          AZURE_COSMOS_DB_ENDPOINT=$(cat ./Azure_Infra_Artifacts/AZURE_COSMOS_DB_ENDPOINT.txt)
+          AZURE_COSMOS_DB_DATABASE_NAME=$(cat ./Azure_Infra_Artifacts/AZURE_COSMOS_DB_DATABASE_NAME.txt)
+          AZURE_COSMOS_DB_CREDENTIAL=$(cat ./Azure_Infra_Artifacts/AZURE_COSMOS_DB_CREDENTIAL.txt)
+          AZURE_COGNITIVE_KEY=$(cat ./Azure_Infra_Artifacts/AZURE_COGNITIVE_KEY.txt)
+          AZURE_COGNITIVE_SEARCH_KEY=$(cat ./Azure_Infra_Artifacts/AZURE_COGNITIVE_SEARCH_KEY.txt)
+          application_insights_connection_string=$(cat ./Azure_Infra_Artifacts/application_insights_connection_string.txt)
+          AZURE_COGNITIVE_ENDPOINT=$(cat ./Azure_Infra_Artifacts/AZURE_COGNITIVE_ENDPOINT.txt)
+          AZURE_COGNITIVE_SEARCH_SERVICE_URL=$(cat ./Azure_Infra_Artifacts/AZURE_COGNITIVE_SEARCH_SERVICE_URL.txt)
+          echo "::add-mask::${ACRloginServerValue}"
+          echo "::add-mask::${ACRAdminUsernameValue}"
+          echo "::add-mask::${ACRAdminPasswordValue}"
+          echo "::add-mask::${AKSClusterNameValue}"
+          echo "::add-mask::${resourceGroupNameValue}"
+          echo "::add-mask::${VPN_ENDPOINT_IP}"
+          echo "::add-mask::${VPN_ENDPOINT_PORT}"
+          echo "::add-mask::${WIREGUARD_ADDRESSES}"
+          echo "::add-mask::${WIREGUARD_PRIVATE_KEY}"
+          echo "::add-mask::${WIREGUARD_PUBLIC_KEY}"
+          echo "::add-mask::${AZURE_COSMOS_DB_CONTAINER_NAME}"
+          echo "::add-mask::${AZURE_COSMOS_DB_ENDPOINT}"
+          echo "::add-mask::${AZURE_COSMOS_DB_DATABASE_NAME}"
+          echo "::add-mask::${AZURE_COSMOS_DB_CREDENTIAL}"
+          echo "::add-mask::${AZURE_COGNITIVE_KEY}"
+          echo "::add-mask::${AZURE_COGNITIVE_SEARCH_KEY}"
+          echo "::add-mask::${application_insights_connection_string}"
+          echo "::add-mask::${AZURE_COGNITIVE_ENDPOINT}"
+          echo "::add-mask::${AZURE_COGNITIVE_SEARCH_SERVICE_URL}"
+          echo "ACRloginServerValue=$ACRloginServerValue" >> $GITHUB_ENV
+          echo "ACRAdminUsernameValue=$ACRAdminUsernameValue" >> $GITHUB_ENV
+          echo "ACRAdminPasswordValue=$ACRAdminPasswordValue" >> $GITHUB_ENV
+          echo "AKSClusterNameValue=$AKSClusterNameValue" >> $GITHUB_ENV
+          echo "resourceGroupNameValue=$resourceGroupNameValue" >> $GITHUB_ENV
+          echo "VPN_ENDPOINT_IP=$VPN_ENDPOINT_IP" >> $GITHUB_ENV
+          echo "VPN_ENDPOINT_PORT=$VPN_ENDPOINT_PORT" >> $GITHUB_ENV
+          echo "WIREGUARD_ADDRESSES=$WIREGUARD_ADDRESSES" >> $GITHUB_ENV
+          echo "WIREGUARD_PRIVATE_KEY=$WIREGUARD_PRIVATE_KEY" >> $GITHUB_ENV
+          echo "WIREGUARD_PUBLIC_KEY=$WIREGUARD_PUBLIC_KEY" >> $GITHUB_ENV
+          echo "AZURE_COSMOS_DB_CONTAINER_NAME=$AZURE_COSMOS_DB_CONTAINER_NAME" >> $GITHUB_ENV
+          echo "AZURE_COSMOS_DB_ENDPOINT=$AZURE_COSMOS_DB_ENDPOINT" >> $GITHUB_ENV
+          echo "AZURE_COSMOS_DB_DATABASE_NAME=$AZURE_COSMOS_DB_DATABASE_NAME" >> $GITHUB_ENV
+          echo "AZURE_COSMOS_DB_CREDENTIAL=$AZURE_COSMOS_DB_CREDENTIAL" >> $GITHUB_ENV
+          echo "AZURE_COGNITIVE_KEY=$AZURE_COGNITIVE_KEY" >> $GITHUB_ENV
+          echo "AZURE_COGNITIVE_SEARCH_KEY=$AZURE_COGNITIVE_SEARCH_KEY" >> $GITHUB_ENV
+          echo "application_insights_connection_string=$application_insights_connection_string" >> $GITHUB_ENV
+          echo "AZURE_COGNITIVE_ENDPOINT=$AZURE_COGNITIVE_ENDPOINT" >> $GITHUB_ENV
+          echo "AZURE_COGNITIVE_SEARCH_SERVICE_URL=$AZURE_COGNITIVE_SEARCH_SERVICE_URL" >> $GITHUB_ENV
+
+
+      - name: Azure account login
+        uses: azure/login@v2
+        with:
+          creds: '{"clientId":"${{ secrets.AZURE_APPID }}","clientSecret":"${{ secrets.AZURE_PASSWORD }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION }}","tenantId":"${{ secrets.AZURE_TENANT }}"}'
+
+
+      - name: Login to ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ACRloginServerValue }}
+          username: ${{ env.ACRAdminUsernameValue }}
+          password: ${{ env.ACRAdminPasswordValue }}
+
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./FastAPIContainer
+          push: true
+          tags: |
+            ${{ env.ACRloginServerValue }}/${{ env.FASTAPI_IMAGE_NAME }}:${{ env.currentCommit }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./Gluetun-WireguardVPNContainer
+          push: true
+          tags: |
+            ${{ env.ACRloginServerValue }}/${{ env.GLUETUN_IMAGE_NAME }}:${{ env.currentCommit }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./AzPythonTweetBotContainer
+          push: true
+          tags: |
+            ${{ env.ACRloginServerValue }}/${{ env.AZURE_FUNCTION_IMAGE_NAME }}:${{ env.currentCommit }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+
+      - name: sed chart values file for artifact upload
+        run: |
+          sed -i 's@^COSMOS_DB_CONTAINER_NAME: [^ ]*@COSMOS_DB_CONTAINER_NAME: ${{ env.AZURE_COSMOS_DB_CONTAINER_NAME }}@' HelmCharts/values.yaml
+          sed -i 's@^COSMOS_DB_ENDPOINT: [^ ]*@COSMOS_DB_ENDPOINT: ${{ env.AZURE_COSMOS_DB_ENDPOINT }}@' HelmCharts/values.yaml
+          sed -i 's@^COSMOS_DB_NAME: [^ ]*@COSMOS_DB_NAME: ${{ env.AZURE_COSMOS_DB_DATABASE_NAME }}@' HelmCharts/values.yaml
+          sed -i 's@^COSMOS_DB_CREDENTIAL: [^ ]*@COSMOS_DB_CREDENTIAL: ${{ env.AZURE_COSMOS_DB_CREDENTIAL }}@' HelmCharts/values.yaml
+          sed -i 's@^TWITTER_CONSUMER_KEY: [^ ]*@TWITTER_CONSUMER_KEY: ${{ env.CONSUMER_KEY }}@' HelmCharts/values.yaml
+          sed -i 's@^TWITTER_CONSUMER_SECRET: [^ ]*@TWITTER_CONSUMER_SECRET: ${{ env.CONSUMER_SECRET }}@' HelmCharts/values.yaml
+          sed -i 's@^TWITTER_ACCESS_TOKEN: [^ ]*@TWITTER_ACCESS_TOKEN: ${{ env.ACCESS_TOKEN }}@' HelmCharts/values.yaml
+          sed -i 's@^TWITTER_ACCESS_TOKEN_SECRET: [^ ]*@TWITTER_ACCESS_TOKEN_SECRET: ${{ env.ACCESS_TOKEN_SECRET }}@' HelmCharts/values.yaml
+          sed -i 's@^COGNITIVE_ENDPOINT: [^ ]*@COGNITIVE_ENDPOINT: ${{ env.AZURE_COGNITIVE_ENDPOINT }}@' HelmCharts/values.yaml
+          sed -i 's@^COGNITIVE_KEY: [^ ]*@COGNITIVE_KEY: ${{ env.AZURE_COGNITIVE_KEY }}@' HelmCharts/values.yaml
+          sed -i 's@^COGNITIVE_SEARCH_ENDPOINT: [^ ]*@COGNITIVE_SEARCH_ENDPOINT: ${{ env.AZURE_COGNITIVE_SEARCH_SERVICE_URL }}@' HelmCharts/values.yaml
+          sed -i 's@^COGNITIVE_SEARCH_KEY: [^ ]*@COGNITIVE_SEARCH_KEY: ${{ env.AZURE_COGNITIVE_SEARCH_KEY }}@' HelmCharts/values.yaml
+          sed -i 's@^APPLICATIONINSIGHTS_CONNECTION_STRING: [^ ]*@APPLICATIONINSIGHTS_CONNECTION_STRING: ${{ env.application_insights_connection_string }}@' HelmCharts/values.yaml
+          sed -i 's@^VPN_ENDPOINT_IP: [^ ]*@VPN_ENDPOINT_IP: ${{ env.VPN_ENDPOINT_IP }}@' HelmCharts/values.yaml
+          sed -i 's@^VPN_ENDPOINT_PORT: [^ ]*@VPN_ENDPOINT_PORT: ${{ env.VPN_ENDPOINT_PORT }}@' HelmCharts/values.yaml
+          sed -i 's@^WIREGUARD_ADDRESSES: [^ ]*@WIREGUARD_ADDRESSES: ${{ env.WIREGUARD_ADDRESSES }}@' HelmCharts/values.yaml
+          sed -i 's@^WIREGUARD_PRIVATE_KEY: [^ ]*@WIREGUARD_PRIVATE_KEY: ${{ env.WIREGUARD_PRIVATE_KEY }}@' HelmCharts/values.yaml
+          sed -i 's@^WIREGUARD_PUBLIC_KEY: [^ ]*@WIREGUARD_PUBLIC_KEY: ${{ env.WIREGUARD_PUBLIC_KEY }}@' HelmCharts/values.yaml
+          sed -i 's@^  imagename1: [^ ]*@  imagename1: ${{ env.ACRloginServerValue }}/${{env.FASTAPI_IMAGE_NAME}}@' HelmCharts/values.yaml
+          sed -i 's@^  imagename2: [^ ]*@  imagename2: ${{ env.ACRloginServerValue }}/${{env.AZURE_FUNCTION_IMAGE_NAME}}@' HelmCharts/values.yaml
+          sed -i 's@^  imagename3: [^ ]*@  imagename3: ${{ env.ACRloginServerValue }}/${{env.GLUETUN_IMAGE_NAME}}@' HelmCharts/values.yaml
+          sed -i 's@^  imagetag1: [^ ]*@  imagetag1: ${{ env.currentCommit }}@' HelmCharts/values.yaml
+          sed -i 's@^  imagetag2: [^ ]*@  imagetag2: ${{ env.currentCommit }}@' HelmCharts/values.yaml
+          sed -i 's@^  imagetag3: [^ ]*@  imagetag3: ${{ env.currentCommit }}@' HelmCharts/values.yaml
+
+
+      - name: Set up kubelogin for non-interactive login
+        uses: azure/use-kubelogin@v1
+        with:
+          kubelogin-version: 'v0.0.25'
+
+
+      - name: Get AKS context
+        uses: azure/aks-set-context@v3
+        with:
+          resource-group: ${{ env.resourceGroupNameValue }}
+          cluster-name: ${{ env.AKSClusterNameValue }}
+          admin: 'false'
+          use-kubelogin: 'true'
+
+
+      - name: Check Azure ACR for existing Helm OCI artifact
+        continue-on-error: true
+        id: OCIchecker
+        run: |
+          helm registry login ${{ env.ACRloginServerValue }} --username ${{ env.ACRAdminUsernameValue }} --password ${{ env.ACRAdminPasswordValue }}
+          az acr manifest list-metadata --registry ${{ env.ACRloginServerValue }} --name akspythonxbot --orderby time_desc
+
+
+      - name: Login to ACR with Helm & push first version
+        if: steps.OCIchecker.outcome != 'success'
+        run: |
+          helm registry login ${{ env.ACRloginServerValue }} --username ${{ env.ACRAdminUsernameValue }} --password ${{ env.ACRAdminPasswordValue }}
+
+          helm package ./HelmCharts
+          helm push akspythonxbot-0.1.0.tgz oci://${{ env.ACRloginServerValue }}
+          helm install akspythonxbot oci://${{ env.ACRloginServerValue }}/akspythonxbot -f ./HelmCharts/values.yaml
+
+
+      - name: Login to ACR with Helm & Get latest Helm OCI artifact version(tag)
+        if: steps.OCIchecker.outcome == 'success'
+        run: |
+          helm registry login ${{ env.ACRloginServerValue }} --username ${{ env.ACRAdminUsernameValue }} --password ${{ env.ACRAdminPasswordValue }}
+          echo "latest_helm_version=$(az acr manifest list-metadata --registry ${{ env.ACRloginServerValue }} --name akspythonxbot --orderby time_desc | jq -r '.[0].tags[0]')" >> $GITHUB_ENV
+
+
+      - name: Increment latest OCI artifact semantic version value by +1 & push + upgrade helm chart to ACR & AKS
+        if: steps.OCIchecker.outcome == 'success'
+        run: |
+          version="${{ env.latest_helm_version }}"
+          IFS='.' read -r major minor patch <<< "$version"
+          minor=$((minor + 1))
+          new_version="${major}.${minor}.0"
+          echo "New version: $new_version"
+          
+          sed -i "s/^version: [^ ]*/version: $new_version/" ./HelmCharts/Chart.yaml
+          sed -i "s/^appVersion: [^ ]*/appVersion: \"$new_version\"/" ./HelmCharts/Chart.yaml
+
+          helm package ./HelmCharts
+          helm push akspythonxbot-$new_version.tgz oci://${{ env.ACRloginServerValue }}
+          helm upgrade akspythonxbot oci://${{ env.ACRloginServerValue }}/akspythonxbot -f ./HelmCharts/values.yaml
+
+
+      - name: Upload latest Helm values.yaml as artifact for other workflows
+        run: |
+          azcopy copy "HelmCharts/values.yaml" "https://${{ secrets.STORAGE_ACCOUNT_NAME_FOR_WIREGUARD_VPN_CONFIGS  }}.blob.core.windows.net/${{ secrets.STORAGE_CONTAINER_NAME_FOR_WIREGUARD_VPN_CONFIGS }}/helm${{ github.run_id }}/" --recursive=true

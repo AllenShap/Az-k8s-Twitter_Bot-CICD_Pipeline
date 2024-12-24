@@ -1,0 +1,240 @@
+name: Build & Push function to ACR
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'AzPythonTweetBotContainer/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  AZURE_FUNCTION_IMAGE_NAME: 'azpythontweetbot-azurefunction'
+  GH_TOKEN: ${{ secrets.MY_PAT_TOKEN }} 
+
+
+
+jobs:
+  build:
+      runs-on: ubuntu-latest
+      steps:
+      - name: Checkout
+        uses: actions/checkout@v4.1.1
+
+
+      - name: Get latest commit SHA to tag Docker images
+        run: |
+          GH_TOKEN=${{ secrets.MY_PAT_TOKEN }} 
+          echo "currentCommit=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+
+      - name: Get latest successful Terraform deployment workflow run id
+        run: |
+          GH_TOKEN=${{ secrets.MY_PAT_TOKEN }} 
+          TFInfraDeploymentRunID=$(gh api /repos/AllenShap/Az-k8s-Twitter_Bot-CICD_Pipeline/actions/runs | jq -r '[.workflow_runs[] | select(.name == "Terraform Build & Deploy")| select(.conclusion == "success")]' | jq '.[0].id')
+          echo "::add-mask::$TFInfraDeploymentRunID"
+          echo "TFInfraDeploymentRunID=$TFInfraDeploymentRunID" >> $GITHUB_ENV  
+
+
+      - name: login to AzCopy with Service Principal credentials
+        env:
+          AZCOPY_SPA_CLIENT_SECRET: ${{ secrets.AZURE_PASSWORD }}
+        run: |
+          azcopy login --service-principal --application-id "${{ secrets.AZURE_APPID }}" --tenant-id "${{ secrets.AZURE_TENANT }}"
+
+
+      - name: Download the latest credentials associated with the provisioned Azure Container Registry and Azure Kubernetes Service
+        run: |
+          azcopy copy "https://${{ secrets.STORAGE_ACCOUNT_NAME_FOR_WIREGUARD_VPN_CONFIGS }}.blob.core.windows.net/${{ secrets.STORAGE_CONTAINER_NAME_FOR_WIREGUARD_VPN_CONFIGS }}/ACRArtifacts${{ env.TFInfraDeploymentRunID }}/" "./ACR_Artifacts/" --recursive
+
+
+      - name: Output ACR credential artifact values
+        id: ACRCreds
+        run: |
+          ACRloginServerValue=$(cat ./ACR_Artifacts/ACRArtifacts${{ env.TFInfraDeploymentRunID }}/loginServer.txt)
+          ACRAdminUsernameValue=$(cat ./ACR_Artifacts/ACRArtifacts${{ env.TFInfraDeploymentRunID }}/adminUsername.txt)
+          ACRAdminPasswordValue=$(cat ./ACR_Artifacts/ACRArtifacts${{ env.TFInfraDeploymentRunID }}/adminPassword.txt)
+          AKSClusterNameValue=$(cat ./ACR_Artifacts/ACRArtifacts${{ env.TFInfraDeploymentRunID }}/aksClusterName.txt)
+          resourceGroupNameValue=$(cat ./ACR_Artifacts/ACRArtifacts${{ env.TFInfraDeploymentRunID }}/resourceGroupName.txt)
+
+          echo "::add-mask::${ACRloginServerValue}"
+          echo "::add-mask::${ACRAdminUsernameValue}"
+          echo "::add-mask::${ACRAdminPasswordValue}"
+          echo "::add-mask::${AKSClusterNameValue}"
+          echo "::add-mask::${resourceGroupNameValue}"
+
+          echo "ACRloginServerValue=$ACRloginServerValue" >> $GITHUB_ENV
+          echo "ACRAdminUsernameValue=$ACRAdminUsernameValue" >> $GITHUB_ENV
+          echo "ACRAdminPasswordValue=$ACRAdminPasswordValue" >> $GITHUB_ENV
+          echo "AKSClusterNameValue=$AKSClusterNameValue" >> $GITHUB_ENV
+          echo "resourceGroupNameValue=$resourceGroupNameValue" >> $GITHUB_ENV
+          
+
+      - name: Azure account login
+        uses: azure/login@v2
+        with:
+          creds: '{"clientId":"${{ secrets.AZURE_APPID }}","clientSecret":"${{ secrets.AZURE_PASSWORD }}","subscriptionId":"${{ secrets.AZURE_SUBSCRIPTION }}","tenantId":"${{ secrets.AZURE_TENANT }}"}'
+
+
+      - name: Login to ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ACRloginServerValue }}
+          username: ${{ env.ACRAdminUsernameValue }}
+          password: ${{ env.ACRAdminPasswordValue }}
+
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+
+      - name: Get timestamps of latest successful workflow runs
+        run: |
+          GH_TOKEN=${{ secrets.MY_PAT_TOKEN }} 
+
+          #Terraform Modification Run successful workflow run timestamp
+          echo "initialAKSDeploymentTimestamp=$(gh api /repos/AllenShap/Az-k8s-Twitter_Bot-CICD_Pipeline/actions/runs | jq -r '[.workflow_runs[] | select(.name == "Terraform Modification Run") | select(.conclusion == "success")]' | jq '.[0].updated_at')" >> $GITHUB_ENV
+
+          #Build & Push fastapi to ACR successful workflow run timestamp
+          echo "latestFastAPIWorkflowTimestamp=$(gh api /repos/AllenShap/Az-k8s-Twitter_Bot-CICD_Pipeline/actions/runs | jq -r '[.workflow_runs[] | select(.name == "Build & Push fastapi to ACR") | select(.conclusion == "success")]' | jq '.[0].updated_at')" >> $GITHUB_ENV
+
+          #Build & Push gluetun to ACR successful workflow run timestamp
+          echo "latestGluetunWorkflowTimestamp=$(gh api /repos/AllenShap/Az-k8s-Twitter_Bot-CICD_Pipeline/actions/runs | jq -r '[.workflow_runs[] | select(.name == "Build & Push gluetun to ACR") | select(.conclusion == "success")]' | jq '.[0].updated_at')" >> $GITHUB_ENV
+          
+          #Build & Push function to ACR successful workflow run timestamp
+          echo "latestAZFunctionWorkflowTimestamp=$(gh api /repos/AllenShap/Az-k8s-Twitter_Bot-CICD_Pipeline/actions/runs | jq -r '[.workflow_runs[] | select(.name == "Build & Push function to ACR") | select(.conclusion == "success")]' | jq '.[0].updated_at')" >> $GITHUB_ENV
+
+
+      - name: Compare timestamps of latest successful workflow runs to find the latest k8s deployment artifact
+        run: |
+          initialAKSDeploymentWorkflowTimestamp=${{ env.initialAKSDeploymentTimestamp }}
+          latestFastAPIWorkflowTimestamp=${{ env.latestFastAPIWorkflowTimestamp }}
+          latestGluetunWorkflowTimestamp=${{ env.latestGluetunWorkflowTimestamp }}
+          latestAZFunctionWorkflowTimestamp=${{ env.latestAZFunctionWorkflowTimestamp }}
+
+          #Check if variables are set to null, if true, then set null variables 0 for Unix timestamp comparison
+              #Main reasons why variable values could be "null"
+              # - No successful workflows executed within the last 90 days
+              # - gh api only returns 30 workflow runs per page, (e.g. If there were 31 workflow runs between the last time a specific workflow was run then it will return a null value if you don't page through the data)
+
+          if [ "$latestFastAPIWorkflowTimestamp" == "null" ]; then
+              echo "Setting latestFastAPIWorkflowTimestamp to 0 since value was null"
+              latestFastAPIWorkflowTimestamp=0
+          fi
+          if [ "$initialAKSDeploymentWorkflowTimestamp" == "null" ]; then
+              echo "Setting initialAKSDeploymentWorkflowTimestamp to 0 since value was null"
+              initialAKSDeploymentWorkflowTimestamp=0
+          fi
+          if [ "$latestGluetunWorkflowTimestamp" == "null" ]; then
+              echo "Setting latestGluetunWorkflowTimestamp to 0 since value was null"
+              latestGluetunWorkflowTimestamp=0
+          fi
+          if [ "$latestAZFunctionWorkflowTimestamp" == "null" ]; then
+              echo "Setting latestAZFunctionWorkflowTimestamp to 0 since value was null"
+              latestAZFunctionWorkflowTimestamp=0
+          fi
+
+          #Convert timestamp values to Unix format 
+          initialAKSDeploymentWorkflowUnixTS=$(date --date "$initialAKSDeploymentWorkflowTimestamp" +'%s')
+          latestFastAPIWorkflowUnixTS=$(date --date "$latestFastAPIWorkflowTimestamp" +'%s')
+          latestGluetunWorkflowUnixTS=$(date --date "$latestGluetunWorkflowTimestamp" +'%s')
+          latestAZFunctionWorkflowUnixTS=$(date --date "$latestAZFunctionWorkflowTimestamp" +'%s')
+
+
+          #This Bash script determines which of four workflows had the most recent successful run based on their Unix timestamps.
+          #All of the latest successful workflow runs share a single artifact which gets updated on each push with the commit SHA that serves as the Docker image tag inside of the artifact 
+          #The Unix timestamp with the largest number is associated with the latest workflow run from which the workflow run ID is then queried (the workflow run ID is required in order to access the artifact which that specific workflow uploaded)
+          #By finding the latest timestamp, you could find the latest workflow run id which would then allow you to find the latest k8s deployment YAML artifact
+  
+  
+          if [[ $latestFastAPIWorkflowUnixTS > $latestGluetunWorkflowUnixTS && $latestFastAPIWorkflowUnixTS > $latestAZFunctionWorkflowUnixTS && $latestFastAPIWorkflowUnixTS > $initialAKSDeploymentWorkflowUnixTS ]]; then
+              echo "$latestFastAPIWorkflowUnixTS is the largest number -- Build & Push fastapi to ACR Workflow uploaded the latest k8s deployment yaml artifact"
+              workflow_name="Build & Push fastapi to ACR"
+              
+          elif [[ $latestGluetunWorkflowUnixTS > $latestAZFunctionWorkflowUnixTS && $latestGluetunWorkflowUnixTS > $latestFastAPIWorkflowUnixTS && $latestGluetunWorkflowUnixTS > $initialAKSDeploymentWorkflowUnixTS ]]; then
+                echo "$latestGluetunWorkflowUnixTS is largest number -- Build & Push gluetun to ACR Workflow uploaded the latest k8s deployment yaml artifact"
+                workflow_name="Build & Push gluetun to ACR"
+                
+          elif [[ $latestAZFunctionWorkflowUnixTS > $latestFastAPIWorkflowUnixTS && $latestAZFunctionWorkflowUnixTS > $latestGluetunWorkflowUnixTS && $latestAZFunctionWorkflowUnixTS > $initialAKSDeploymentWorkflowUnixTS ]]; then
+                echo "$latestAZFunctionWorkflowUnixTS is largest number -- Build & Push function to ACR Workflow uploaded the latest k8s deployment yaml artifact"
+                workflow_name="Build & Push function to ACR"
+                
+          elif [[ $initialAKSDeploymentWorkflowUnixTS > $latestFastAPIWorkflowUnixTS && $initialAKSDeploymentWorkflowUnixTS > $latestGluetunWorkflowUnixTS && $initialAKSDeploymentWorkflowUnixTS > $latestAZFunctionWorkflowUnixTS ]]; then
+                echo "$initialAKSDeploymentWorkflowUnixTS is largest number -- Terraform Modification Run Workflow uploaded the latest k8s deployment yaml artifact"
+                workflow_name="Terraform Modification Run"
+          fi
+
+
+          if [[ -n "$workflow_name" ]]; then # Check if a workflow name was found
+              LatestWorkflowRunID=$(gh api /repos/CrimsonGlacier/workingk8sdeployment/actions/runs | jq -r --arg workflow_name "$workflow_name" '[.workflow_runs[] | select(.name == $workflow_name) | select(.conclusion == "success")] | .[0].id')
+              echo "::add-mask::$LatestWorkflowRunID"
+              echo "LatestWorkflowRunID=$LatestWorkflowRunID" >> $GITHUB_ENV
+          else
+              echo "No suitable workflow run found."
+              exit 1 # Or handle the error as needed
+          fi
+
+
+      - name: Download the latest Helm Chart values build artifact
+        run: |
+          azcopy copy "https://${{ secrets.STORAGE_ACCOUNT_NAME_FOR_WIREGUARD_VPN_CONFIGS }}.blob.core.windows.net/${{ secrets.STORAGE_CONTAINER_NAME_FOR_WIREGUARD_VPN_CONFIGS }}/helm${{ env.LatestWorkflowRunID }}/values.yaml" "./HelmCharts" --recursive
+
+      - name: Build and push AZFunction Docker image with the current commit SHA as tag
+        uses: docker/build-push-action@v5
+        with:
+          context: ./AzPythonTweetBotContainer
+          push: true
+          tags: |
+            ${{ env.ACRloginServerValue }}/${{ env.AZURE_FUNCTION_IMAGE_NAME }}:${{ env.currentCommit }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+
+      - name: Set up kubelogin for non-interactive login
+        uses: azure/use-kubelogin@v1
+        with:
+          kubelogin-version: 'v0.0.25'
+        
+
+      - name: Get AKS context
+        uses: azure/aks-set-context@v3
+        with:
+          resource-group: ${{ env.resourceGroupNameValue }}
+          cluster-name: ${{ env.AKSClusterNameValue }}
+          admin: 'false'
+          use-kubelogin: 'true'
+
+
+      - name: sed chart values file for artifact upload
+        run: |
+          sed -i 's@^  imagename2: [^ ]*@  imagename2: ${{ env.ACRloginServerValue }}/${{env.AZURE_FUNCTION_IMAGE_NAME}}@' HelmCharts/values.yaml
+          sed -i 's@^  imagetag2: [^ ]*@  imagetag2: ${{ env.currentCommit }}@' HelmCharts/values.yaml
+
+
+      - name: Login to ACR with Helm & Get latest Helm OCI artifact version(tag)
+        run: |
+          helm registry login ${{ env.ACRloginServerValue }} --username ${{ env.ACRAdminUsernameValue }} --password ${{ env.ACRAdminPasswordValue }}
+          echo "latest_helm_version=$(az acr manifest list-metadata --registry ${{ env.ACRloginServerValue }} --name akspythonxbot --orderby time_desc | jq -r '.[0].tags[0]')" >> $GITHUB_ENV
+
+
+      - name: Increment latest OCI artifact semantic version value by +1 & push + upgrade helm chart to ACR & AKS
+        run: |
+          version="${{ env.latest_helm_version }}"
+          IFS='.' read -r major minor patch <<< "$version"
+          patch=$((patch + 1))
+          new_version="${major}.${minor}.${patch}"
+          echo "New version: $new_version"
+
+          sed -i "s/^version: [^ ]*/version: $new_version/" ./HelmCharts/Chart.yaml
+          sed -i "s/^appVersion: [^ ]*/appVersion: \"$new_version\"/" ./HelmCharts/Chart.yaml
+
+          helm package ./HelmCharts/
+          helm push akspythonxbot-$new_version.tgz oci://${{ env.ACRloginServerValue }}
+          helm upgrade akspythonxbot oci://${{ env.ACRloginServerValue }}/akspythonxbot -f ./HelmCharts/values.yaml
+
+          
+      - name: Upload latest Helm values.yaml as artifact for other workflows
+        run: |
+          azcopy copy "HelmCharts/values.yaml" "https://${{ secrets.STORAGE_ACCOUNT_NAME_FOR_WIREGUARD_VPN_CONFIGS  }}.blob.core.windows.net/${{ secrets.STORAGE_CONTAINER_NAME_FOR_WIREGUARD_VPN_CONFIGS }}/helm${{ github.run_id }}/" --recursive=true
