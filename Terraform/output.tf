@@ -94,3 +94,6 @@ output "WG_Storage_Container_Name" {
   sensitive   = true
 }
 
+output "outboundip" {
+  value = module.az_kubernetes_cluster_create.outboundip
+}
