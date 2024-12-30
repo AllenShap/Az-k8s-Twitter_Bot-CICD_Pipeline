@@ -3,3 +3,7 @@ output "aks_cluster_name" {
   description = "Name of AKS cluster"
   sensitive   = true
 }
+
+output "outboundip" {
+  value = data.azurerm_public_ip.PIP-Associated_With_AKS_Cluster.ip_address
+}
