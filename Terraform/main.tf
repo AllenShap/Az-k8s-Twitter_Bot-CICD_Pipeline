@@ -11,11 +11,11 @@ module "az_AKS_resource_group_create" {
 }
 
 module "az_storage_account_create" {
-  depends_on                                     = [module.az_resource_group_create]
-  source                                         = "./modules/azure_storage_account"
-  resource_group_location                        = var.resource_group_location
-  resource_group_name                            = var.resource_group_name
-  Storage_Account_Name_for_WireGuard_VPN_Configs = var.Storage_Account_Name_for_WireGuard_VPN_Configs
+  depends_on                                       = [module.az_resource_group_create]
+  source                                           = "./modules/azure_storage_account"
+  resource_group_location                          = var.resource_group_location
+  resource_group_name                              = var.resource_group_name
+  Storage_Account_Name_for_WireGuard_VPN_Configs   = var.Storage_Account_Name_for_WireGuard_VPN_Configs
   Storage_Container_Name_for_WireGuard_VPN_Configs = var.Storage_Container_Name_for_WireGuard_VPN_Configs
 }
 
@@ -42,6 +42,7 @@ module "az_virtual_machine_create" {
   sas_url_for_azcopy        = module.az_storage_account_create.sas_url_to_upload_to
   WG_Storage_Account_Name   = module.az_storage_account_create.WG_Storage_Account_Name
   WG_Storage_Container_Name = module.az_storage_account_create.WG_Storage_Container_Name
+  outboundip                = module.az_kubernetes_cluster_create.outboundip
 }
 
 module "az_key_vault_create" {
