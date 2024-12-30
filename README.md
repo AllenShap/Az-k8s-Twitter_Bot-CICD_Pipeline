@@ -2,17 +2,17 @@ This project provides a fully automated, one-click deployment of a secure and ro
 
 Triggered by a single action, the CI/CD pipeline provisions an Azure infrastructure, including:
 - **An AKS cluster hosting the Twitter bot application** (cluster mainly consists of a VPN Client, FastAPI, and application container).
-- **A Linux VM acting as a WireGuard VPN server** (dynamically generates connection details on first boot and stores them securely).
+- **A Linux VM acting as a Wireguard VPN server** (dynamically generates connection details on first boot and stores them securely).
 - **Supporting Azure resources like a Key Vault and Storage Account** (for SSH key storage and build artifacts).
 - **A CosmosDB Serverless NoSQL database** (for backend application data). 
 
-The AKS cluster's internet access is exclusively routed through an established WireGuard VPN tunnel, ensuring enhanced security.
+The AKS cluster's internet access is exclusively routed through an established Wireguard VPN tunnel, ensuring enhanced security.
 
 This project is backed by a comprehensive CI/CD pipeline, driven by GitHub Actions, it automates image building, tagging with commit SHAs, and Helm chart updates following semantic versioning.
 
 This streamlined approach enables rapid development and deployment of a secure and scalable Twitter bot solution on Azure.
 
-**To understand this project and it's outcomes better the following information could be beneficial:**
+**To understand this project and it's outcomes better, the following information could be beneficial:**
 - [Infrastructure, workflow, and CI/CD diagrams.](https://github.com/AllenShap/Az-k8s-Twitter_Bot-CICD_Pipeline/blob/main/Infrastructure_Diagrams.md)
 - [Comprehensive list of project features.](https://github.com/AllenShap/Az-k8s-Twitter_Bot-CICD_Pipeline/blob/main/Features_Of_Project.md)
 - [Instructions to successfully deploy this project.](https://github.com/AllenShap/Az-k8s-Twitter_Bot-CICD_Pipeline/blob/main/Deployment_Instructions.md)
