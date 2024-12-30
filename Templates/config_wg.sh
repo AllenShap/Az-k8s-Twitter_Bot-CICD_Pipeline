@@ -12,5 +12,5 @@ sed -i "s#\$server_1_postup#$(printf %s "$(echo 'iptables -A FORWARD -i wg0 -j A
 sed -i "s#\$server_1_postdown#$(printf %s "$(echo 'iptables -D FORWARD -i wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE')")#g" /etc/wireguard/wg0.conf
 sed -i "s#\$server_1_listenport#$(printf %s "$(echo '55525')")#g" /etc/wireguard/wg0.conf
 sed -i "s#\$server_1_allowed_addr#$(printf %s "$(echo '10.0.0.5/32')")#g" /etc/wireguard/wg0.conf
-sed -i "s#\$server_1_endpoint#$(printf %s "$(echo '77.30.169.217:55525')")#g" /etc/wireguard/wg0.conf
+sed -i "s#\$server_1_endpoint#$(printf %s "$(cat /etc/wireguard/aks_endpoint_pip.txt)":55525)#g" /etc/wireguard/wg0.conf
 sed -i "s#\$client_1_endpoint#$(printf %s:%d "$(curl ifconfig.me)" 55525)#g" /etc/wireguard/client01.conf
