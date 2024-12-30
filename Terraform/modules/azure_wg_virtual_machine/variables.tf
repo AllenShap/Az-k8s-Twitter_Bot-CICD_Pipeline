@@ -33,3 +33,8 @@ variable "WG_Storage_Container_Name" {
   type        = string
   sensitive   = true
 }
+
+variable "outboundip" {
+  type        = string
+  description = "aks ip"
+}
