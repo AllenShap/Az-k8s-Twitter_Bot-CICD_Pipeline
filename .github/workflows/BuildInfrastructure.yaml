@@ -71,6 +71,7 @@ jobs:
         AZURE_COGNITIVE_SEARCH_SERVICE_URL=$(printf "%s\n" $(terraform -chdir="./Terraform" output -raw AZURE_COGNITIVE_SEARCH_SERVICE_URL))
         WG_Storage_Account_Name=$(printf "%s\n" $(terraform -chdir="./Terraform" output -raw WG_Storage_Account_Name))
         WG_Storage_Container_Name=$(printf "%s\n" $(terraform -chdir="./Terraform" output -raw WG_Storage_Container_Name))
+        outboundip=$(printf "%s\n" $(terraform -chdir="./Terraform" output -raw outboundip))
 
         echo "::add-mask::${AZURE_COSMOS_DB_CONTAINER_NAME}"
         echo "::add-mask::${AZURE_COSMOS_DB_ENDPOINT}"
@@ -126,9 +127,9 @@ jobs:
         azcopy login --service-principal --application-id "${{ secrets.AZURE_APPID }}" --tenant-id "${{ secrets.AZURE_TENANT }}"
 
 
-      # Sleep here is required since the VM does not always finish uploading all files into the Azure Storage Container by this point in the workflow which causes the following workflow to fail
-    - name: Sleep for 30 seconds
-      run: sleep 30s
+      # Sleep here is unfortunately required since the VM does not always finish uploading all files into the Azure Storage Container by this point in the workflow which causes the following workflows to fail
+    - name: Sleep for 240 seconds -- 4 minutes
+      run: sleep 240s
       shell: bash
 
 
