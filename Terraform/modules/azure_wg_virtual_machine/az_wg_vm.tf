@@ -8,6 +8,7 @@ data "template_file" "users_data" {
 
   vars = {
     az_copy_sas = "https://${var.WG_Storage_Account_Name}.blob.core.windows.net/${var.WG_Storage_Container_Name}${var.sas_url_for_azcopy}"
+    aks_pip = "${var.outboundip}"
   }
 }
 
