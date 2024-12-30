@@ -14,6 +14,11 @@ resource "azurerm_kubernetes_cluster" "AKS-KubernetesPythonTwitterBot" {
   identity {
     type = "SystemAssigned"
   }
+
+  network_profile {
+    network_plugin    = "kubenet"
+    load_balancer_sku = "standard"
+  }
 }
 
 resource "azurerm_role_assignment" "ACR-PullRoleAssignment" {
@@ -21,4 +26,9 @@ resource "azurerm_role_assignment" "ACR-PullRoleAssignment" {
   role_definition_name             = "AcrPull"
   scope                            = var.acr_id
   skip_service_principal_aad_check = true
+}
+
+data "azurerm_public_ip" "PIP-Associated_With_AKS_Cluster" {
+  name                = split("/",tolist(azurerm_kubernetes_cluster.AKS-KubernetesPythonTwitterBot.network_profile[0].load_balancer_profile[0].effective_outbound_ips)[0])[8]
+  resource_group_name = split("/",tolist(azurerm_kubernetes_cluster.AKS-KubernetesPythonTwitterBot.network_profile[0].load_balancer_profile[0].effective_outbound_ips)[0])[4]
 }
