@@ -18,7 +18,7 @@ This streamlined approach enables rapid development and deployment of a secure a
 - [Instructions to successfully deploy this project.](https://github.com/AllenShap/Az-k8s-Twitter_Bot-CICD_Pipeline/blob/main/Deployment_Instructions.md)
 
 <p align="center">
-      <em>Below is the final outcome of this project and the resulting network flow</em>
+      <em>Below is the final architectural outcome of this project and the resulting network flow</em>
   <br>
 </p>
 
@@ -32,4 +32,10 @@ This streamlined approach enables rapid development and deployment of a secure a
   <em>Below is an *extremely* simple diagram of the final network flow in AKS upon successful implementation of this project.</em>
   <img src="https://github.com/user-attachments/assets/0f4697f4-bb76-4a25-a827-cd9cae09d46f">
   <br>
+</p>
+
+Successful deployment of this project will allow you to have a Python Twitter bot hosted on Azure which generates tweets upon new article postings and article title updates from the U.S. section of the New York Times:
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/82ecb804-f66a-4d89-a222-14547c3b4fe8">
 </p>
