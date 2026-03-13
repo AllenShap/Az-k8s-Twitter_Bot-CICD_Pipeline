@@ -2,7 +2,9 @@
 
 For brevity, the aspects of the tfstate file, and creation of a priveleged enough account to run this workflow is withheld.
 
-Prerequisites: 
+Recommended & Prerequisites: 
+- General understanding of the the project diagrams and how all systems are interconnected to eachother found [here.](https://github.com/AllenShap/Az-k8s-Twitter_Bot-CICD_Pipeline/blob/main/Infrastructure_Diagrams.md).
+- General understanding of cloud native application creation and deployment lifecycles. 
 - An X(formerly Twitter) developer account which has an app created -- Can sign up and create one here: https://developer.x.com/en
 - An existing .tfstatefile in a backend Azure Storage Account Container
 - An existing Azure Service Principal to function as the IAC provisioner of all Azure Resources
@@ -18,7 +20,7 @@ Prerequisites:
 **4.** Deployment is Successful and complete!
 
 
-Unfortunately, since this is a public repo, a big long ugly list of secrets needs to be created and set in order for anyone to replicate the project deployment ( never store secrets in code! ).
+Unfortunately, since this is a public repo, a long list of secrets needs to be created and set in order for anyone to replicate the project deployment since secrets should not be in code.
 
 
 The following values should be pasted with the values quoted (ex. "secret_value") into the GitHub secret values:
