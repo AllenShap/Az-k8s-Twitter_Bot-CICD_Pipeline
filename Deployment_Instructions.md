@@ -3,7 +3,7 @@
 For brevity, the aspects of the tfstate file, and creation of a priveleged enough account to run this workflow is withheld.
 
 Recommended & Prerequisites: 
-- General understanding of the the project diagrams and how all systems are interconnected to eachother found [here.](https://github.com/AllenShap/Az-k8s-Twitter_Bot-CICD_Pipeline/blob/main/Infrastructure_Diagrams.md).
+- General understanding of the the project diagrams and how all systems are interconnected to eachother found [here](https://github.com/AllenShap/Az-k8s-Twitter_Bot-CICD_Pipeline/blob/main/Infrastructure_Diagrams.md).
 - General understanding of cloud native application creation and deployment lifecycles. 
 - An X(formerly Twitter) developer account which has an app created -- Can sign up and create one here: https://developer.x.com/en
 - An existing .tfstatefile in a backend Azure Storage Account Container
